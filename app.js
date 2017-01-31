@@ -3,28 +3,29 @@
 var cliCreator = require('./index');
 
 var options = {
+	options:{
+		start: 'root'
+	},
 	model:{
-		main:{
-			title:"Main Menu",
+		root:{
+			title: "Main Menu",
 			options:[
 				{
-					title:"Create/Edit Alexa Application",
-					pointer:"createEditMain"
+					title: "Create/Edit An Application",
+					pointer: "createEditMain"
 				}
 			]
 		},
-		createEditMain:{
+		createEditMain: {
+			title: "Create/Edit Your Applications",
 			options:[
 				{
-					title:"Add/Edit Application Environment Variable(s)",
-					pointer:"globalVarMain"
-				}
-			]
-		},
-		globalVarMain:{
-			options:[
+					title: "New Application",
+					pointer: "newApp"
+				},
 				{
-					title:"Add New Environment Variable"
+					title: "Edit Application",
+					point: "editApp"
 				}
 			]
 		}

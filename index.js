@@ -1,8 +1,9 @@
 var term = require('terminal-kit').terminal;
+var isEnding = false;
 
 //CURRENT OPTIONS
 /*
-persistHints, 
+persistHints, start
 */
 
 // CONSTRUCTOR
@@ -28,12 +29,14 @@ var cli = module.exports = function(config){
 
 // RUN APPLICATION
 cli.prototype.run = function(){
-	//INITIALIZE FULLSCREEN
-	term.fullscreen(true);
+	if(!isEnding){
+		//INITIALIZE FULLSCREEN
+		term.fullscreen(true);
 
-	//ADD LISTENERS
-	term.on('key', keyClick);
-	this.menuCycle();
+		//ADD LISTENERS
+		term.on('key', keyClick);
+		this.menuCycle();
+	}
 }
 
 // OTHER METHODS - SHOULD NOT BE CALLED AS INDEPENDENT METHOD
@@ -73,7 +76,7 @@ cli.prototype.displayMenu = function(){
 	var menu = this.model[this.currentMenu];
 	var navText = ""
 	for(var k = 0; k < this.navStack.length; k++){
-		navText += (this.model[this.navStack[k]].title || ("Menu #"+(k+1))) + "/";
+		navText += (this.model[this.navStack[k]].title || ("Menu #"+(k+1))) + " -> ";
 	}
 	var menuTitle = menu.title || ("Menu #" + (this.navStack.length + 1));
 	term.blue.underline("%s",navText);
@@ -83,8 +86,13 @@ cli.prototype.displayMenu = function(){
 		var errorFound = false;
 		for(var i = 0; i <= options.length; i++){
 			if(i == options.length){
-				if(this.navStack.length > 0)
-					term.blue.bold("%d : Back to Previous Menu\n",(i+1));
+				if(this.navStack.length > 0){
+					if(this.model[this.navStack[this.navStack.length-1]].title)
+						var prevMenuTitle = " (\""+this.model[this.navStack[this.navStack.length-1]].title+"\")";
+					else
+						var prevMenuTitle = "";
+					term.blue.bold("%d : Back to Previous Menu%s\n",(i+1),prevMenuTitle);
+				}
 			}else{
 				if(typeof options[i].title !== 'string')
 					errorFound = true;
@@ -140,11 +148,9 @@ function keyClick(name, matches, data){
 function error(type, message){
 	term.bold.red("\n\n✘ %s ERROR: %s\n\n", type.toUpperCase(), message);
 	if(type.match(/fatal/i)){
-		delay(4, function(){
-			term.fullscreen(false);
-			term.clear();
-			process.exit();
-		})
+		isEnding = true;
+		term.blue.bold("CTRL_C to exit immediately\n\n")
+		delay(4, exit)
 	}else
 		return;
 }
