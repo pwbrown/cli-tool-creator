@@ -1,0 +1,22 @@
+{
+  "name": "cli-tool-creator",
+  "version": "1.0.0",
+  "description": "Tool for generating custom CLI applications",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pwbrown/cli-tool-creator.git"
+  },
+  "author": "Philip Brown",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pwbrown/cli-tool-creator/issues"
+  },
+  "homepage": "https://github.com/pwbrown/cli-tool-creator#readme",
+  "dependencies": {
+    "terminal-kit": "^0.26.1"
+  }
+}
