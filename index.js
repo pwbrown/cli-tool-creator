@@ -1,5 +1,6 @@
 var term = require('terminal-kit').terminal,
-	jsonfile = require('jsonfile');
+	jsonfile = require('jsonfile'),
+	fs = require('fs');
 var isEnding = false;
 
 //CURRENT OPTIONS
@@ -9,6 +10,7 @@ persistHints, start
 
 // CONSTRUCTOR
 var cli = module.exports = function(config){
+	term.on('key', keyClick);
 	if(typeof config !== 'object'){
 		error('fatal', 'cli-creator is missing an options object');
 	}
@@ -24,21 +26,6 @@ var cli = module.exports = function(config){
 	}else{
 		error('fatal', 'cli-creator cannot locate starting menu');
 	}
-	if(typeof this.options.configFile == 'undefined'){
-		error('fatal', 'cli-creator cannot find a config file location to read or output to');
-	}else{
-		var inputFile = {};
-		try{
-			inputFile = jsonfile.readFileSync(this.options.configFile);
-		}catch(e){
-			try{
-				jsonfile.writeFileSync(this.options.configFile, {}, {spaces: 4});
-			}catch(e){
-				error('fatal', 'cli-creator could not open or create a file in the specified location');
-			}
-		}
-		this.config = inputFile;
-	}
 	this.navStack = [];  //Store the current navigation stack
 	this.hintShown = {};
 	this.displayedWelcome = false;
@@ -47,17 +34,127 @@ var cli = module.exports = function(config){
 // RUN APPLICATION
 cli.prototype.run = function(){
 	if(!isEnding){
-		//INITIALIZE FULLSCREEN
-		term.fullscreen(true);
-
-		//ADD LISTENERS
-		term.on('key', keyClick);
-
-		this.menuCycle();
+		if(typeof this.options.estimatedDir == 'undefined'){
+			error('fatal', 'cli-creator needs an estimated directory to search for valid applications');
+		}else{
+			this.findConfigFile(function(){ //Will call this.isReady emitter when finished loading config data
+				//INITIALIZE FULLSCREEN
+				term.fullscreen(true);
+				this.menuCycle();
+			}.bind(this));
+		}
 	}
 }
 
 // OTHER METHODS - SHOULD NOT BE CALLED AS INDEPENDENT METHOD
+
+//Function to locate or create config file
+cli.prototype.findConfigFile = function(cb){
+	try{
+		var dirList = fs.readdirSync(this.options.estimatedDir);
+	}catch(e){
+		error('fatal', 'Failed to search the estimated directory');
+	}
+	dirList = dirList.filter(function(item){
+		if(item.match(/\.json$/i) && !item.match(/package/))
+			return true;
+		else
+			return false;
+	})
+	if(dirList.length > 0){
+		var validApps = [];
+		for(var i = 0; i < dirList.length; i++){
+			var thisConfig = null;
+			try{
+				var testFile = (this.options.estimatedDir[this.options.estimatedDir.length-1] == "/")? dirList[i] : "/" + dirList[i];
+				thisConfig = jsonfile.readFileSync(this.options.estimatedDir + testFile);
+			}catch(e){
+				//We don't need to do anything
+			}
+			if(thisConfig !== null && typeof thisConfig.searchIdentifier !== 'undefined' && thisConfig.searchIdentifier == 'cli-tool-creator'){
+				validApps.push({
+					dir: this.options.estimatedDir + testFile,
+					name: thisConfig.appName || "No Name",
+					data: thisConfig
+				})
+			}
+		}
+		if(validApps.length > 0){
+			if(validApps.length == 1){
+				//We have a single valid app, so just use it
+				this.config = validApps[0].data;
+				this.configDir = validApps[0].dir;
+				return cb();
+			}else{
+				return this.chooseApplication(validApps, cb);
+			}
+		}else{
+			this.createApplication(cb);
+		}
+	}else{
+		//ASK TO GENERATE NEW CONFIGURATION FILE
+		this.createApplication(cb);
+	}
+
+}
+
+//Asks user to choose which application to load in
+cli.prototype.chooseApplication = function(apps, cb){
+	term.fullscreen(true);
+	term.clear();
+	term.blue.bold("Multiple Applications were found in your directory!\n\n");
+	term.blue("Please choose one of the following to load:\n\n");
+	for(var i = 0; i < apps.length; i++){
+		term.blue.bold("%d : Load \"%s\"\n",(i+1), apps[i].name);
+	}
+	term("\n\n");
+	this.inputField("Please select an application to load: ", {
+		int: true,
+		regex: /^[0-9]{1,2}$/,
+		error: "Please enter a valid number from the list",
+		min: 1,
+		max: apps.length
+	}, function(appId){
+		this.config = apps[appId-1].data;
+		this.configDir = apps[appId-1].dir;
+		return cb();
+	}.bind(this));
+}
+
+//Will Prompt user to create an application and generate a config file
+cli.prototype.createApplication = function(cb){
+	term.fullscreen(true);
+	term.clear();
+	term.blue.bold("No Applications were found in our search.\n");
+	term.blue("Tip: Make sure your config file contains \"searchIdentifier\": \"cli-tool-creator\"\n\n");
+	this.yesOrNo("Would you like to create a new application? [Y|n]", function(result){
+		if(!result) return exit();
+		else{
+			this.inputField("Please Enter a name for your application: ",{
+				regex: /^[a-z ]+$/i,
+				error: "Please try again with only letters and spaces"
+			}, function(name){
+				var app = {
+					searchIdentifier: 'cli-tool-creator',
+					appName: name
+				}
+				var fileName = name.toLowerCase().replace(" ", "_") + '.json';
+				if(this.options.estimatedDir[this.options.estimatedDir.length-1] == "/")
+					var fileLocation = this.options.estimatedDir + fileName;
+				else
+					var fileLocation = this.options.estimatedDir + "/" + fileName;
+				this.config = app;
+				this.configDir = fileLocation;
+				try{
+					jsonfile.writeFileSync(fileLocation, app, {spaces: 2});
+					return cb();
+				}catch(e){
+					return error('fatal', 'Could not create application file');
+				}
+			}.bind(this));
+		}
+	}.bind(this));
+}
 
 //Main Menu Cycling method, will repeat until program is exited
 cli.prototype.menuCycle = function(){
@@ -136,37 +233,67 @@ cli.prototype.displayMenu = function(){
 
 //Method to handle selecting a menu option by parsing number input
 cli.prototype.selectMenuOption = function(cb){
-	term.blue("Select A Menu Option");
-	if(!this.hintShown.selectMenuOption){
-		term.blue("(Type option # or use up/down keys): ");
-		if(!this.options.persistHints)
-			this.hintShown.selectMenuOption = true;
-	}else
-		term.blue(": ");
 	var history = indexHistory(this.model[this.currentMenu].options.length, ((this.navStack.length > 0)? true : false));
-	term.inputField({history: history}, function(err, selection){
-		var optionsArray = this.model[this.currentMenu].options;
+	var optionsArray = this.model[this.currentMenu].options;
+	var max = optionsArray.length;
+	if(this.navStack.length > 0) max++;
+	this.inputField("Menu Option(Type option # or use up/down keys): ",{
+		inputOptions:{
+			history:history
+		},
+		regex: /^[0-9]{1,2}$/,
+		error: 'Please enter a valid menu item number',
+		int: true,
+		max: max,
+		min: 1
+	}, function(selection){
+		return cb(selection-1);
+	})
+}
+
+//Error Check implementation of inputField
+cli.prototype.inputField = function(prompt, options, cb){
+	term.blue.bold("%s",prompt);
+	term.inputField((options.inputOptions || {}), function(err, result){
+		if(options.error) var errorMsg = options.error;
+		else var errorMsg = "Invalid input, please try again";
 		if(typeof err !== 'undefined' && err !== null){
-			error('input', 'Failed to get selection, please try again');
-			return this.selectMenuOption(cb)
-		}else if(typeof selection == 'string' && selection.match(/^ *[0-9]{1,3} *$/)){
-			selection = selection.trim();
-			selection = parseInt(selection);
-			if(isNaN(selection)){
-				error('input', 'Please enter a valid menu item number');
-				return this.selectMenuOption(cb);
-			}else if((selection == optionsArray.length+1 && this.navStack.length > 0) || (selection > 0 && selection <= optionsArray.length)){
-				return cb(selection - 1);  //Index offset
-			}else{
-				error('input', "Please enter a valid menu item number");
-				return this.selectMenuOption(cb);
-			}
+			error('input', 'Failed to get user input, try again.');
+			this.inputField(prompt, options, cb);
 		}else{
-			error('input', 'Please enter a valid menu item number');
-			return this.selectMenuOption(cb);
+			try{result = result.trim()}catch(e){}  //Attempt to trim result
+			if(typeof result !== 'undefined' && result !== '' && (!options.regex || (options.regex && result.match(options.regex)))){
+				if(options.int){
+					result = parseInt(result);
+					if((options.max && result > options.max) || (options.min && result < options.min)){
+						error('input', errorMsg);
+						return this.inputField(prompt, options, cb);
+					}
+				}
+				cb(result);
+			}else{
+				error('input', errorMsg);
+				return this.inputField(prompt, options, cb);
+			}
 		}
 	}.bind(this))
 }
+
+cli.prototype.yesOrNo = function(prompt, cb){
+	term.blue.bold("%s\n\n",prompt);
+	term.yesOrNo({yes:['y','Y','ENTER'],no:['N','n']}, function(err, result){
+		if(typeof err !== 'undefined' && err !== null){
+			error('Asking', 'Failed to get user response, please try again');
+			return this.yesOrNo(prompt, cb);
+		}else{
+			if(result)
+				cb(true);
+			else
+				cb(false);
+		}
+	}.bind(this));
+}
+
 
 //Special parser for conditional string inputs
 cli.prototype.parseText = function(txt){
