@@ -27,24 +27,29 @@ var cli = module.exports = function(config){
 		this.config = {};
 		//Holds location of config object within the file system (Automatically set on run)
 		this.configDir = "";
+		this.isEnding = false;
+	}else{
+		this.isEnding = true;
 	}
 }
 
 
 //Initiates start of cli program
 cli.prototype.run = function(){
-	//Initialize key click listener to allow user to exit at any point
-	term.on('key', keyClick);
+	if(!this.isEnding){
+		//Initialize key click listener to allow user to exit at any point
+		term.on('key', keyClick);
 
-	//Load/Create an application
-	this.loadApplication(function(){
-		//Application is ready to use so...
-		//Enter fullscreen
-		term.fullscreen(true);
-		term.clear();
-		//Begin our Menu Cycle
-		this.loadCurrentMenu();
-	}.bind(this));
+		//Load/Create an application
+		this.loadApplication(function(){
+			//Application is ready to use so...
+			//Enter fullscreen
+			term.fullscreen(true);
+			term.clear();
+			//Begin our Menu Cycle
+			this.loadCurrentMenu();
+		}.bind(this));
+	}
 }
 
 //Searches for valid applications using the estimatedDir
@@ -427,6 +432,12 @@ cli.prototype.checkConfigForErrors = function(config){
 	if((typeof config.options.start == 'string' && typeof config.model[config.options.start] !== 'object') || (typeof config.options.start == 'undefined' && typeof config.model.main !== 'object')){
 		term.on('key', keyClick); //Add key click listener
 		this.error('configuration', 'Configuration model is missing a starting menu called \"'+((typeof config.options.start == 'string' && typeof config.model[config.options.start] !== 'object')? config.options.start : 'main')+"\"", true);
+		return true;
+	}
+	var start = config.model[(config.options.start || 'main')];
+	if(typeof start.options == 'undefined' || typeof start.options.length == 'undefined' || start.options.length == 0){
+		term.on('key', keyClick);
+		this.error('configuration', 'Starting menu is missing options to display',true);
 		return true;
 	}
 	return false;
