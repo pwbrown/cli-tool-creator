@@ -4,30 +4,48 @@ var cliCreator = require('./index');
 
 var options = {
 	options:{
-		start: 'root'
+		estimatedDir: __dirname
 	},
 	model:{
-		root:{
-			title: "Main Menu",
+		main:{
+			title: "($1|Alexa Application){appName} Main Menu",
 			options:[
 				{
-					title: "Create/Edit An Application",
-					pointer: "createEditMain"
+					title: "Manage Application Variables",
+					pointer: "appVarsMain"
 				}
 			]
 		},
-		createEditMain: {
-			title: "Create/Edit Your Applications",
+		appVarsMain:{
+			title: "Application Variable Manager",
 			options:[
 				{
-					title: "New Application",
-					pointer: "newApp"
+					title: "Add a new string value",
+					create: "string",
+					loc: "appVars.$USER_KEY",
+					keyPrompt: "Enter the name of your application variable: ",
+					prompt: "Enter the value of your application variable: "
 				},
 				{
-					title: "Edit Application",
-					point: "editApp"
+					title: "Add a new number value",
+					create: "float",
+					loc: "appVars.$USER_KEY"
+				},
+				{
+					title: "Add a new boolean value",
+					create: "boolean",
+					loc: "appVars.$USER_KEY"
+				},
+				{
+					title: "Edit existing variables",
+					dependency: "appVars.$EXISTS",
+					pointer: "editAppVars"
 				}
 			]
+		},
+		editAppVars:{
+			title: "Edit an application Variable",
+			options: "appVars"
 		}
 	}
 }

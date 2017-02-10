@@ -22,7 +22,7 @@ var cli = module.exports = function(config){
 		//Indicates whether CLI is in the process of ending execution (prevents race conditions)
 		this.isEnding = false;
 		//For use with dynamic lists created by objects or arrays to indicate selected option index/key
-		this.objectKey = 0;
+		this.keyStack = [];
 		//Holds configuration object that cli tool is modifying (Automatically set on run)
 		this.config = {};
 		//Holds location of config object within the file system (Automatically set on run)
@@ -84,8 +84,16 @@ cli.prototype.loadCurrentMenu = function(){
 	this.setMenuList();          //Load in Options
 	this.displayMenuOptions();   //Display Options
 	this.selectMenuOption(function(optionNum){
-		term("selected option %d\n", optionNum);
-	});
+		//GOING BACK
+		if(optionNum == this.menuList.length){
+			this.currentMenu = (this.navStack.splice(this.navStack.length-1,1))[0];
+			return this.loadCurrentMenu();
+		}else{
+			this.handleOptions(this.menuList[optionNum], function(){
+				this.loadCurrentMenu();
+			}.bind(this))
+		}
+	}.bind(this));
 }
 
 //Displays options in a menu-like form
@@ -116,9 +124,90 @@ cli.prototype.selectMenuOption = function(cb){
 		max: max,
 		min: 1
 	}, function(selection){
+		term("\n\n");
 		return cb(selection-1);
 	})
 }
+
+//Handles the various options that can be associated with a menu item
+cli.prototype.handleOptions = function(item, cb){
+	if(item.create || item.insert)
+		this.setConfig(item, cb);
+	else if(item.pointer){
+		if(typeof this.model[item.pointer] !== 'undefined'){
+			this.navStack.push(this.currentMenu);
+			this.currentMenu = item.pointer;
+			cb();
+		}else{
+			this.error('pointer', 'Could not find ' + item.pointer + ' menu', true);
+		}
+	}
+	else{
+		cb();
+	}
+}
+
+cli.prototype.setConfig = function(options, cb){
+	if(typeof options.loc == 'string' && options.loc !== ""){
+		this.getKeys(options, function(keys){
+			this.getValue(options, function(value){
+				console.log(value);
+				var failed = false;
+				var map = options.loc.split(".");
+				map = getArrayKeys(map);
+				filled = fillArrayKeys(map, keys);
+				var currentValue = null;
+				while(map.length > 0){
+					if(currentValue == null) currentValue = value;
+					var key = (map.splice((map.length-1),1))[0];  //Grab the last key in the mapping)
+					var filledKey = filled.splice(filled.length-1,1); //Remove the same key index from filled array as well
+					if(key == '$USER_KEY' || key == '$INDEX'){
+						key = filledKey;
+						var valueBeforeKey = this.getConfig(null, null, filled);
+					}else{
+						var valueBeforeKey = this.getConfig(null, null, filled);
+					}
+					var temp = JSON.parse(JSON.stringify(currentValue));
+					if(valueBeforeKey){
+						currentValue = valueBeforeKey;
+					}else{
+						currentValue = {};
+					}
+					currentValue[key] = temp;
+				}
+				this.config = currentValue;
+				this.saveConfig(function(){
+					return cb();
+				});
+			}.bind(this))
+		}.bind(this))
+	}else{
+		this.error('Create/Insert', 'Menu item is missing a \"loc\" option', true);
+	}
+}
+
+cli.prototype.saveConfig = function(cb){
+	jsonfile.writeFile(this.configDir, this.config, {spaces: 2}, function(err){
+		if(err)
+			this.error('File Write', 'Failed to save changes', true);
+		else
+			cb();
+	})
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -222,7 +311,6 @@ cli.prototype.createApplication = function(cb){
 				}catch(e){
 					return this.error('File System', 'Could not create the application file', true);
 				}
-
 				return cb();
 			}.bind(this))
 		}
@@ -262,6 +350,70 @@ cli.prototype.setMenuList = function(){
 		}.bind(this))
 	}else{
 		return this.error('Options', 'Current Menu is missing an options attribute', true);
+	}
+}
+
+//Returns keys required for setConfig.  Combination of keyStack and user generated keys
+cli.prototype.getKeys = function(options, cb){
+	var keyParse = options.loc.match(/(?:\$USER_KEY|\$INDEX)/g);
+	if(typeof keyParse !== 'undefined' && keyParse !== null){
+		var keysNeeded = keyParse.length - this.keyStack.length;
+		if(keysNeeded <= 0)
+			return cb(this.keyStack);
+		else if(keysNeeded > 1)
+			return this.error('User Key', 'Only one key can be generated at a time');
+		else if(keysNeeded == 1){
+			var prompt = "Enter a key name: ";
+			var regex = /^[a-z][a-z0-9]*$/i;
+			var error = "Only use alphanumeric characters and key must begin with a letter";
+			this.inputField((options.keyPrompt || prompt), {
+				regex: (options.keyRegex || regex),
+				error: (options.keyError || error)
+			}, function(keyName){
+				term("\n\n");
+				var keys = [];
+				keys = keys.concat(this.keyStack);
+				keys.push(keyName);
+				return cb(keys);
+			}.bind(this))
+		}
+	}else{
+		return cb([])
+	}
+}
+
+//Asks user for an input value using given options
+cli.prototype.getValue = function(options, cb){
+	var possibleTypes = ['string', 'integer', 'float', 'boolean', 'array', 'object'];
+	var type = options.create || options.insert;
+	if(typeof type !== 'string' || possibleTypes.indexOf(type.toLowerCase()) == -1)
+		type = 'string'; //default to string input
+	type = type.toLowerCase();
+	if(type == 'array')
+		return cb([]);
+	else if(type == 'object')
+		return cb({});
+	else if(type == 'boolean'){
+		var prompt = "Choose your response [Y|n] ";
+		this.yesOrNo((options.prompt || prompt), function(response){
+			return cb(response);	
+		})
+	}else if(type == 'string' || type == 'integer' || type == 'float'){
+		var regex = /.*/;
+		var error = "Invalid input. Please try again.";
+		var prompt = "Please enter in " + ((type == 'integer')? "an " : "a ") + type + " value: ";
+		var inputOptions = {
+			regex: options.regex || regex,
+			error: options.error || error,
+		}
+		if(type == 'integer') inputOptions.int = true;
+		else if(type == 'float') inputOptions.float = true;
+		if(options.max) inputOptions.max = options.max;
+		if(options.min) inputOptions.min = options.min;
+		this.inputField((options.prompt || prompt), inputOptions, function(value){
+			term("\n\n");
+			return cb(value);
+		})
 	}
 }
 
@@ -308,10 +460,15 @@ cli.prototype.parseText = function(input){
 }
 
 //Searches through config model for value at specified key mapping
-cli.prototype.getConfig = function(keyMap, returnType){
-	var map = keyMap.split(".");  //For nested values
+cli.prototype.getConfig = function(keyMap, returnType, preParsedArray){
+	if(preParsedArray)
+		var map = preParsedArray;
+	else{
+		var map = keyMap.split(".");  //For nested values
+	}
 	var currentValue = null;
 	var found = true;
+	if(map.length == 0) return this.config;
 	while(map.length > 0){
 		var key = (map.splice(0,1))[0]; //Grab the first key in the current map
 		if(currentValue == null) currentValue = this.config;
@@ -388,7 +545,7 @@ cli.prototype.displayPrevMenuOption = function(){
 //Checks if an option has a valid dependency
 cli.prototype.hasDependency = function(option){
 	if(option.dependency){
-		if(this.getConfigValue(option.dependency))
+		if(this.getConfig(option.dependency))
 			return true;
 		else
 			return false;
@@ -474,9 +631,10 @@ cli.prototype.inputField = function(prompt, options, cb){
 		}else{
 			try{result = result.trim()}catch(e){}  //Attempt to trim result
 			if(typeof result !== 'undefined' && result !== '' && (!options.regex || (options.regex && result.match(options.regex)))){
-				if(options.int){
-					result = parseInt(result);
-					if((options.max && result > options.max) || (options.min && result < options.min)){
+				if(options.int || options.float){
+					if(options.int) result = parseInt(result);
+					else result = parseFloat(result);
+					if(isNaN(result) || (options.max && result > options.max) || (options.min && result < options.min)){
 						this.error('input', errorMsg);
 						return this.inputField(prompt, options, cb);
 					}
@@ -549,6 +707,32 @@ function indexHistory(length, prev){
 	for(var i = 0; i < length; i++)
 		history.push((length-i).toString());
 	return history;
+}
+
+//Accepts an array of key strings and parses and adds keys related to array syntax
+function getArrayKeys(array){
+	for(var i = 0; i < array.length; i++){
+		var parts = array[i].match(/^(.+)\[(.*)\]$/);
+		if(parts !== null){
+			array.splice(i,1,parts[1]);
+			array.splice((i+1),0,parts[2]);
+			i++;
+		}
+	}
+	return array;
+}
+function fillArrayKeys(map, keys){
+	var keyIndex = 0;
+	var filledMap = [];
+	for(var i = 0; i < map.length; i++){
+		if(map[i] == '$INDEX' || map[i] == '$USER_KEY'){
+			filledMap.push(keys[keyIndex]);
+			keyIndex++;
+		}else{
+			filledMap.push(map[i]);
+		}
+	}
+	return filledMap;
 }
 
 //Function to exit execution
