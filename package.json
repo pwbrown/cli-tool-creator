@@ -1,6 +1,6 @@
 {
   "name": "cli-tool-creator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tool for generating custom CLI applications",
   "main": "index.js",
   "scripts": {
