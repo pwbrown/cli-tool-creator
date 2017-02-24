@@ -37,7 +37,7 @@ var cli = new cliCreator({
 					sequence:[
 						{
 							prompt: "Enter method (GET or POST: Use up/down keys to choose): ",
-							arrowSelect: ['GET','POST'],
+							arrowSelect: ['POST','GET'],
 							key: "method"
 						},
 						{
@@ -64,7 +64,8 @@ var cli = new cliCreator({
 				{
 					title: "Edit the http method",
 					create: "string",
-					loc: "api.$USER_KEY.method"
+					loc: "api.$USER_KEY.method",
+					arrowSelect: ['POST','GET']
 				}
 			]
 		}

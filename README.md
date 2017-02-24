@@ -1,12 +1,17 @@
 # CLI Tool Creator
 ***
+
 ##Description
 A CLI wrapper for your application configuration json files. Highly customizable to fit the needs of YOU, the developer.  Give it the content to display and the functionality to implement and this tool will take care of generating an approachable command-line graphical interface for your application users to interact with.
+
 ##Purpose
 This package seeks to resolve the concern of providing a complex but custom configuration model for your software that is easy for the end user to interact with and easy to build for the application developer. Inspiration for this project came from the use of custom command line interface tools that were built to aid in helping obsfucate the end result of the software from the nitty gritty details of its implementation.  A great example of this end result is the "package.json" file we so frequently use and love. It's not often that us as application developers would take the time to manually create our package.json file object, so we use tools like "npm init". Npm init is a great example of a very custom and simplistic use case of a command line interface, but this package seeks to help you as the developer replicate it's end result but with much more freedom and custom functionality.
-#NOTE: This project is in an *Alpha Testing* state and has not been published to npm. Use the temporary install path to get started
+
+#NOTE: This project is in an *Alpha Testing* state and is not guarenteed to work properly in all cases
+
 ##Installation
 	npm install cli-tool-creator --save
+	
 ##Basic structure to get you started
 ```Javascript
 //Retrieve the package
@@ -27,8 +32,11 @@ cli.run();
 ```
 
 ***
+
 #Creating your application's Command Line Interface
+
 ***
+
 ##Step 1: Provide options
 *  ***The following model defines the available options***
 
@@ -38,6 +46,7 @@ options:{
 	start: "string",                //- OPTIONAL
 }
 ```
+
 ###***estimatedDir*** - definition
 
 estimatedDir is the estimated location of the end-user's configuration file.  This allows this CLI package to search the estimated directory for valid configuration files and automatically load them into the custom CLI tool.  It is recommended to make use of nodejs built-in file system commands/variables to aid in this process.  ***This is also the location that the config file is saved to if the user goes through the prompts to create a new application.*** For example:
@@ -51,6 +60,7 @@ estimatedDir is the estimated location of the end-user's configuration file.  Th
 start defines the name of a key in the root structure of the model to decide which menu to display first. This name is optional and if not provided will default to ***"main"***. Refer to model documentation (Step 2) for details on creating menus
 
 ##***Additional Options:***
+
 ###--*Welcome Text*
 **Options are as follows:**
 
