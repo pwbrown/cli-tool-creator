@@ -1,55 +1,74 @@
-//TEMPORARY TEST APPLICATION
-
 var cliCreator = require('./index');
 
-var options = {
+var cli = new cliCreator({
 	options:{
-		estimatedDir: __dirname
+		estimatedDir: __dirname,
+		useNotifier: true,
+		notificationIcon: './pizza.png',
+		notificationTitle: "ACLJ User Manager",
+		notificationTimeout: 5,
+		welcomeTitle: "Test Title",
+		welcomeDescription: "Test Description",
+		backgroundColor: "white",
+		welcomeColor: "Magenta",
+		menuTitleColor: "Blue",
+		menuColor: "Cyan",
+		promptColor: "black"
 	},
 	model:{
 		main:{
-			title: "($1|Alexa Application){appName} Main Menu",
+			title: "Main Menu",
 			options:[
 				{
-					title: "Manage Application Variables",
-					pointer: "appVarsMain"
+					title: "Manage API Methods",
+					pointer: "apiMethods"
 				}
 			]
 		},
-		appVarsMain:{
-			title: "Application Variable Manager",
+		apiMethods:{
+			title: "Manage API Methods",
 			options:[
 				{
-					title: "Add a new string value",
+					title: "Add a new api method",
+					loc: "api.$USER_KEY",
+					create: "sequence",
+					keyPrompt: "Enter api shortcut name: ",
+					message: "Successfully added new api method",
+					sequence:[
+						{
+							prompt: "Enter method (GET or POST: Use up/down keys to choose): ",
+							arrowSelect: ['GET','POST'],
+							key: "method"
+						},
+						{
+							prompt: "Enter an api uri: ",
+							key: "url"
+						}
+					]
+				},
+				{
+					title: "Edit existing api methods(: $1 methods){api.$SIZE}",
+					dependency: "api.$SIZE",
+					pointer: "editAPI"
+				}
+			]
+		},
+		editAPI:{
+			title: "Customize your api method",
+			options: "api",
+			pointer: "apiIndividual"
+		},
+		apiIndividual:{
+			title: "Edit your api method",
+			options: [
+				{
+					title: "Edit the http method",
 					create: "string",
-					loc: "appVars.$USER_KEY",
-					keyPrompt: "Enter the name of your application variable: ",
-					prompt: "Enter the value of your application variable: "
-				},
-				{
-					title: "Add a new number value",
-					create: "float",
-					loc: "appVars.$USER_KEY"
-				},
-				{
-					title: "Add a new boolean value",
-					create: "boolean",
-					loc: "appVars.$USER_KEY"
-				},
-				{
-					title: "Edit existing variables",
-					dependency: "appVars.$EXISTS",
-					pointer: "editAppVars"
+					loc: "api.$USER_KEY.method"
 				}
 			]
-		},
-		editAppVars:{
-			title: "Edit an application Variable",
-			options: "appVars"
 		}
 	}
-}
-
-var cli = new cliCreator(options);
+});
 
 cli.run();

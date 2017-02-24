@@ -1,6 +1,19 @@
 var term = require('terminal-kit').terminal,
 	jsonfile = require('jsonfile'),
-	fs = require('fs');
+	fs = require('fs'),
+	notifier = require('node-notifier');
+
+var colors = ['black','red','green','yellow','blue','magenta','cyan','white'];
+var colorCodes = {
+	black:[0,0,0],
+	red:[180,0,0],
+	green:[0,180,0],
+	yellow:[180,180,0],
+	blue:[0,0,180],
+	magenta:[180,0,180],
+	cyan:[0,180,180],
+	white:[220,220,220]
+}
 
 //Class Constructor
 var cli = module.exports = function(config){
@@ -23,11 +36,14 @@ var cli = module.exports = function(config){
 		this.isEnding = false;
 		//For use with dynamic lists created by objects or arrays to indicate selected option index/key
 		this.keyStack = [];
+		//Works with key stack to determine if a stack variable should be removed when going to the previous menu
+		this.shouldRemoveKey = [];
 		//Holds configuration object that cli tool is modifying (Automatically set on run)
 		this.config = {};
 		//Holds location of config object within the file system (Automatically set on run)
 		this.configDir = "";
 		this.isEnding = false;
+		this.defineColors();
 	}else{
 		this.isEnding = true;
 	}
@@ -39,12 +55,14 @@ cli.prototype.run = function(){
 	if(!this.isEnding){
 		//Initialize key click listener to allow user to exit at any point
 		term.on('key', keyClick);
+		term.windowTitle(this.config.appName || this.options.welcomeTitle || "CLI Application");
 
 		//Load/Create an application
 		this.loadApplication(function(){
 			//Application is ready to use so...
 			//Enter fullscreen
 			term.fullscreen(true);
+			term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 			term.clear();
 			//Begin our Menu Cycle
 			this.loadCurrentMenu();
@@ -87,6 +105,9 @@ cli.prototype.loadCurrentMenu = function(){
 		//GOING BACK
 		if(optionNum == this.menuList.length){
 			this.currentMenu = (this.navStack.splice(this.navStack.length-1,1))[0];
+			var shouldRemove = (this.shouldRemoveKey.splice(this.shouldRemoveKey.length-1,1))[0];
+			if(shouldRemove)
+				this.keyStack.splice(this.keyStack.length-1,1);
 			return this.loadCurrentMenu();
 		}else{
 			this.handleOptions(this.menuList[optionNum], function(){
@@ -98,12 +119,13 @@ cli.prototype.loadCurrentMenu = function(){
 
 //Displays options in a menu-like form
 cli.prototype.displayMenuOptions = function(){
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	term.clear();
 	this.displayWelcomeMessage();
 	this.displayStackReference();
 	for(var i = 0; i < this.menuList.length; i++){
 		var title = this.menuList[i].title || "Title Not Found";
-		term.blue.bold("%d : %s\n", (i+1), this.parseText(title));
+		term[this.menuColor].bold("%d : %s\n", (i+1), this.parseText(title));
 	}
 	this.displayPrevMenuOption();
 	term("\n\n");
@@ -136,6 +158,12 @@ cli.prototype.handleOptions = function(item, cb){
 	else if(item.pointer){
 		if(typeof this.model[item.pointer] !== 'undefined'){
 			this.navStack.push(this.currentMenu);
+			if(typeof item.thisIndex !== 'undefined'){
+				this.keyStack.push(item.thisIndex);
+				this.shouldRemoveKey.push(true);
+			}else{
+				this.shouldRemoveKey.push(false);
+			}
 			this.currentMenu = item.pointer;
 			cb();
 		}else{
@@ -146,97 +174,6 @@ cli.prototype.handleOptions = function(item, cb){
 		cb();
 	}
 }
-
-cli.prototype.setConfig = function(options, cb){
-	if(typeof options.loc == 'string' && options.loc !== ""){
-		this.getKeys(options, function(keys){
-			this.getValue(options, function(value){
-				console.log(value);
-				var failed = false;
-				var map = options.loc.split(".");
-				map = getArrayKeys(map);
-				filled = fillArrayKeys(map, keys);
-				var currentValue = null;
-				while(map.length > 0){
-					if(currentValue == null) currentValue = value;
-					var key = (map.splice((map.length-1),1))[0];  //Grab the last key in the mapping)
-					var filledKey = filled.splice(filled.length-1,1); //Remove the same key index from filled array as well
-					if(key == '$USER_KEY' || key == '$INDEX'){
-						key = filledKey;
-						var valueBeforeKey = this.getConfig(null, null, filled);
-					}else{
-						var valueBeforeKey = this.getConfig(null, null, filled);
-					}
-					var temp = JSON.parse(JSON.stringify(currentValue));
-					if(valueBeforeKey){
-						currentValue = valueBeforeKey;
-					}else{
-						currentValue = {};
-					}
-					currentValue[key] = temp;
-				}
-				this.config = currentValue;
-				this.saveConfig(function(){
-					return cb();
-				});
-			}.bind(this))
-		}.bind(this))
-	}else{
-		this.error('Create/Insert', 'Menu item is missing a \"loc\" option', true);
-	}
-}
-
-cli.prototype.saveConfig = function(cb){
-	jsonfile.writeFile(this.configDir, this.config, {spaces: 2}, function(err){
-		if(err)
-			this.error('File Write', 'Failed to save changes', true);
-		else
-			cb();
-	})
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //**PROTOTYPE HELPER FUNCTIONS**
 
@@ -263,11 +200,12 @@ cli.prototype.findValidApplications = function(files){
 //Allows user to choose a valid application
 cli.prototype.chooseValidApplication = function(apps, cb){
 	term.fullscreen(true);
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	term.clear();
-	term.blue.bold.underline("Multiple applications were found in your directory!\n\n");
-	term.blue("Please choose one of the following to load:\n\n");
+	term[this.promptColor].bold.underline("Multiple applications were found in your directory!\n\n");
+	term[this.promptColor]("Please choose one of the following to load:\n\n");
 	for(var i = 0; i < apps.length; i++)
-		term.blue.bold("%d : Load in \"%s\"", (i+1), apps[i].name);
+		term[this.promptColor].bold("%d : Load in \"%s\"", (i+1), apps[i].name);
 	term("\n\n");
 	this.inputField("Please select an application to load: ", {
 		int: true,
@@ -285,12 +223,13 @@ cli.prototype.chooseValidApplication = function(apps, cb){
 //Allows user to create a new application
 cli.prototype.createApplication = function(cb){
 	term.fullscreen(true);
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	term.clear();
-	term.blue.bold.underline("No Valid Applications were found in our search.\n");
-	term.blue.italic("Tip: If you do have an application make sure we can find it by including the root attribute \"searchIdentifier\": \"cli-tool\"\n\n");
+	term[this.promptColor].bold.underline("No Valid Applications were found in our search.\n");
+	term[this.promptColor].italic("Tip: If you do have an application make sure we can find it by including the root attribute \"searchIdentifier\": \"cli-tool\"\n\n");
 	this.yesOrNo("Would you like to create a new application? [Y|n]", function(result){
 		if(!result){
-			term.blue.bold("Goodbye!!\n\n");
+			term[this.promptColor].bold("Goodbye!!\n\n");
 			delay(1, exit);
 		}else{
 			this.inputField("Please enter a name for your application: ",{
@@ -384,11 +323,15 @@ cli.prototype.getKeys = function(options, cb){
 
 //Asks user for an input value using given options
 cli.prototype.getValue = function(options, cb){
-	var possibleTypes = ['string', 'integer', 'float', 'boolean', 'array', 'object'];
+	var possibleTypes = ['string', 'integer', 'float', 'boolean', 'array', 'object', 'sequence'];
 	var type = options.create || options.insert;
 	if(typeof type !== 'string' || possibleTypes.indexOf(type.toLowerCase()) == -1)
 		type = 'string'; //default to string input
 	type = type.toLowerCase();
+	if(type == 'sequence')
+		this.getSequence(JSON.parse(JSON.stringify(options)), function(sequenceStructure){
+			return cb(sequenceStructure);
+		});
 	if(type == 'array')
 		return cb([]);
 	else if(type == 'object')
@@ -405,6 +348,9 @@ cli.prototype.getValue = function(options, cb){
 		var inputOptions = {
 			regex: options.regex || regex,
 			error: options.error || error,
+			inputOptions:{
+				history: options.arrowSelect || []
+			}
 		}
 		if(type == 'integer') inputOptions.int = true;
 		else if(type == 'float') inputOptions.float = true;
@@ -414,6 +360,30 @@ cli.prototype.getValue = function(options, cb){
 			term("\n\n");
 			return cb(value);
 		})
+	}
+}
+
+//Handles multiple value inputs at a time
+cli.prototype.getSequence = function(options, cb){
+	if(typeof options.sequence == 'undefined' || typeof options.sequence.length == 'undefined'){
+		return cb(false);
+	}else{
+		if(options.sequence.length == 0){
+			return cb(options.finalSequence || false);
+		}else{
+			if(!options.finalSequence) options.finalSequence = {};
+			var _this = (options.sequence.splice(0,1))[0];
+			if(typeof _this.key !== 'string' || _this.key == ''){
+				this.error('Sequence', 'Item is missing a key', true);
+				//return cb(false);
+			}
+			this.getValue(_this, function(_thisValue){
+				if(typeof _thisValue !== 'undefined'){
+					options.finalSequence[_this.key] = _thisValue;
+				}
+				this.getSequence(options, cb);
+			}.bind(this));
+		}
 	}
 }
 
@@ -436,7 +406,7 @@ cli.prototype.parseText = function(input){
 				var format = "(([^$])\\$"+(index+1)+"|^\\$"+(index+1)+")";
 				var regex = new RegExp(format, 'g');
 				successDisplay = successDisplay.replace(regex, function(orig, match, before){
-					if(typeof value == 'string'){
+					if(typeof value == 'string' || typeof value == 'number'){
 						if(typeof before !== 'undefined')
 							return before + value;
 						else
@@ -462,7 +432,7 @@ cli.prototype.parseText = function(input){
 //Searches through config model for value at specified key mapping
 cli.prototype.getConfig = function(keyMap, returnType, preParsedArray){
 	if(preParsedArray)
-		var map = preParsedArray;
+		var map = JSON.parse(JSON.stringify(preParsedArray));
 	else{
 		var map = keyMap.split(".");  //For nested values
 	}
@@ -474,8 +444,9 @@ cli.prototype.getConfig = function(keyMap, returnType, preParsedArray){
 		if(currentValue == null) currentValue = this.config;
 		//HANDLE DIFFERENT OPTIONS
 		if(key == '$SIZE'){  //Make sure size of the 
-			if(objectSize(currentValue) > 0)
-				return true;
+			var size = objectSize(currentValue);
+			if(size > 0)
+				return size;
 			else
 				return false;
 		}else if(key == '$EXISTS'){
@@ -514,31 +485,86 @@ cli.prototype.getConfig = function(keyMap, returnType, preParsedArray){
 	}
 }
 
+//Accepts options to set a configuration value at a certain location ("loc") key mapping
+cli.prototype.setConfig = function(options, cb){
+	if(typeof options.loc == 'string' && options.loc !== ""){
+		this.getKeys(options, function(keys){
+			this.getValue(options, function(value){
+				var failed = false;
+				var map = options.loc.split(".");
+				map = getArrayKeys(map);
+				filled = fillArrayKeys(map, keys);
+				var currentValue = null;
+				var first = true;
+				while(map.length > 0){
+					if(currentValue == null) currentValue = value;
+					var valueAtKey = this.getConfig(null, null, filled);
+					var key = (map.splice((map.length-1),1))[0];  //Grab the last key in the mapping)
+					var filledKey = (filled.splice(filled.length-1,1))[0]; //Remove the same key index from filled array as well
+					if(key == '$USER_KEY' || key == '$INDEX') key = filledKey;
+					var valueBeforeKey = this.getConfig(null, null, filled);
+					if(typeof valueAtKey == 'object' && typeof valueAtKey.length !== 'undefined' && options.insert && first){  //Check if we have an array
+						first = false;
+						var temp = JSON.parse(JSON.stringify(currentValue));
+						currentValue = valueAtKey;
+						if(typeof options.index === 'number') currentValue.splice(options.index,0,temp);
+						else currentValue.push(temp);
+					}else if(options.insert && first){
+						first = false;
+						var temp = JSON.parse(JSON.stringify(currentValue));
+						currentValue = [];
+						currentValue.push(temp);
+					}
+					var temp = JSON.parse(JSON.stringify(currentValue));
+					if(valueBeforeKey){
+						currentValue = valueBeforeKey;
+					}else{
+						currentValue = {};
+					}
+					currentValue[key] = temp;
+				}
+				this.config = currentValue;
+				this.saveConfig(function(){
+					if(options.message && options.message !== ""){
+						this.notify({message: options.message});
+					}
+					return cb();
+				}.bind(this));
+			}.bind(this))
+		}.bind(this))
+	}else{
+		this.error('Create/Insert', 'Menu item is missing a \"loc\" option', true);
+	}
+}
+
 // Will display welcome title and description if not already displayed
 cli.prototype.displayWelcomeMessage = function(){
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	if(!this.displayedWelcome){
 		this.displayedWelcome = true;
 		if(typeof this.options.welcomeTitle == 'string' && this.options.welcomeTitle !== '')
-			term.blue.bold.underline("%\n\n", this.parseText(this.options.welcomeTitle));
+			term[this.welcomeColor].bold.underline("%s\n\n", this.parseText(this.options.welcomeTitle));
 		if(typeof this.options.welcomeDescription == 'string' && this.options.welcomeDescription !== '')
-			term.blue.bold.italic("%s\n\n\n", this.parseText(this.options.welcomeDescription));
+			term[this.welcomeColor].bold.italic("%s\n\n\n", this.parseText(this.options.welcomeDescription));
 	}
 }
 
 // Will display menu stack reference
 cli.prototype.displayStackReference = function(){
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	var navText = "";
 	for(var i = 0; i < this.navStack.length; i++)
 		navText += (this.model[this.navStack[i]].title || ("Menu #"+(i+1))) + " -> ";
 	var menuTitle = this.model[this.currentMenu].title || ("Menu #" + (this.navStack.length + 1));
-	term.blue.italic.underline("%s",this.parseText(navText));
-	term.blue.bold.underline("%s\n\n",this.parseText(menuTitle));
+	term[this.menuTitleColor].italic.underline("%s",this.parseText(navText));
+	term[this.menuTitleColor].bold.underline("%s\n\n",this.parseText(menuTitle));
 }
 
 //Will Display Previous Menu Option when nav stack length is non-zero
 cli.prototype.displayPrevMenuOption = function(){
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	if(this.navStack.length > 0){
-		term.blue.bold("%d : Back to Previous Menu\n", (this.menuList.length + 1));
+		term[this.menuColor].bold("%d : Back to Previous Menu\n", (this.menuList.length + 1));
 	}
 }
 
@@ -556,10 +582,15 @@ cli.prototype.hasDependency = function(option){
 
 //Handles displaying error to terminal (optional shouldTerminate)
 cli.prototype.error = function(label, message, shouldTerminate){
+	if(this.backgroundColor)
+		term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	term.bold.red("\n\n✘ %s ERROR: %s\n\n", label.toUpperCase(), message);
 	if(shouldTerminate){
 		this.isEnding = true;
-		term.blue.bold("CTRL_C to exit immediately\n\n");
+		if(this.promptColor)
+			term[this.promptColor].bold("CTRL_C to exit immediately\n\n");
+		else
+			term.blue.bold("CTRL_C to exit immediately\n\n");
 		delay(4, exit);
 	}
 }
@@ -600,12 +631,32 @@ cli.prototype.checkConfigForErrors = function(config){
 	return false;
 }
 
+//Mac and Windows Notifications Function
+cli.prototype.notify = function(options){
+	var notifOptions = {};
+	if(options.message && options.message !== "" && this.options.useNotifier){
+		notifOptions.message = options.message;
+		if(options.title && options.title !== "") notifOptions.title = options.title;
+		else if(this.options.notificationTitle && this.options.notificationTitle !== "") notifOptions.title = this.options.notificationTitle;
+		else if(this.config.appName && this.config.appName !== "") notifOptions.title = this.config.appName;
+		else notifOptions.title = "Application Tool";
+		if(this.options.notificationSound) notifOptions.sound = true;
+		if(this.options.notificationIcon && this.options.notificationIcon !== "") notifOptions.icon = this.options.notificationIcon;
+		else notifOptions.icon = './cli.png';
+		if(typeof this.options.notificationTimeout == 'number') notifOptions.timeout = this.options.notificationTimeout;
+		else notifOptions.timeout = 5;
+		notifOptions.closeLabel = "Close";
+		notifier.notify(notifOptions);
+	}
+}
+
 
 //**PROTOTYPE TERMINAL HELPER FUNCTIONS**
 
 //Terminal Boolean prompt (yes = true, no = false)
 cli.prototype.yesOrNo = function(prompt, cb){
-	term.blue.bold("%s\n\n",prompt);
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
+	term[this.promptColor].bold("%s\n\n",prompt);
 	term.yesOrNo({yes:['y','Y','ENTER'],no:['N','n']}, function(err, result){
 		if(typeof err !== 'undefined' && err !== null){
 			this.error('Asking', 'Failed to get user response, please try again');
@@ -621,7 +672,8 @@ cli.prototype.yesOrNo = function(prompt, cb){
 
 //Error Check implementation of inputField
 cli.prototype.inputField = function(prompt, options, cb){
-	term.blue.bold("%s",prompt);
+	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
+	term[this.promptColor](true).bold("%s",prompt);
 	term.inputField((options.inputOptions || {}), function(err, result){
 		if(options.error) var errorMsg = options.error;
 		else var errorMsg = "Invalid input, please try again";
@@ -630,7 +682,7 @@ cli.prototype.inputField = function(prompt, options, cb){
 			this.inputField(prompt, options, cb);
 		}else{
 			try{result = result.trim()}catch(e){}  //Attempt to trim result
-			if(typeof result !== 'undefined' && result !== '' && (!options.regex || (options.regex && result.match(options.regex)))){
+			if(typeof result !== 'undefined' && (!options.regex || (options.regex && result.match(options.regex)))){
 				if(options.int || options.float){
 					if(options.int) result = parseInt(result);
 					else result = parseFloat(result);
@@ -646,6 +698,25 @@ cli.prototype.inputField = function(prompt, options, cb){
 			}
 		}
 	}.bind(this))
+}
+
+//Saves the value currently stored in this.config to the loaded configuration file
+cli.prototype.saveConfig = function(cb){
+	jsonfile.writeFile(this.configDir, this.config, {spaces: 2}, function(err){
+		if(err)
+			this.error('File Write', 'Failed to save changes', true);
+		else
+			cb();
+	})
+}
+
+//Defines global colors for different parts of the application
+cli.prototype.defineColors = function(){
+	this.backgroundColor = (typeof this.options.backgroundColor == 'string' && colors.indexOf(this.options.backgroundColor.toLowerCase()) !== -1)? this.options.backgroundColor.toLowerCase() : 'white';
+	this.welcomeColor = (typeof this.options.welcomeColor == 'string' && colors.indexOf(this.options.welcomeColor.toLowerCase()) !== -1)? this.options.welcomeColor.toLowerCase() : 'blue';
+	this.menuTitleColor = (typeof this.options.menuTitleColor == 'string' && colors.indexOf(this.options.menuTitleColor.toLowerCase()) !== -1)? this.options.menuTitleColor.toLowerCase() : 'blue';
+	this.menuColor = (typeof this.options.menuColor == 'string' && colors.indexOf(this.options.menuColor.toLowerCase()) !== -1)? this.options.menuColor.toLowerCase() : 'blue';
+	this.promptColor = (typeof this.options.promptColor == 'string' && colors.indexOf(this.options.promptColor.toLowerCase()) !== -1)? this.options.promptColor.toLowerCase() : 'blue';
 }
 
 
@@ -744,7 +815,7 @@ function exit(){
 
 //Delay function with built in countdown timer (Will execute callback on completion)
 function delay(amount, cb){
-	term.blue.underline("%d...",amount);
+	term.red.underline("%d...",amount);
 	setTimeout(function(){
 		if(amount == 0){
 			cb();
