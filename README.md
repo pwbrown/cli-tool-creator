@@ -1,3 +1,10 @@
+[![★](https://img.shields.io/github/stars/pwbrown/cli-tool-creator.svg?label=★)](https://github.com/pwbrown/cli-tool-creator/stargazers)
+[![License](https://img.shields.io/github/license/cronvel/terminal-kit.svg)](https://github.com/pwbrown/cli-tool-creator/blob/master/LICENSE)
+[![Downloads](https://img.shields.io/npm/dm/cli-tool-creator.svg)](https://www.npmjs.com/package/cli-tool-creator)
+[![Version](https://img.shields.io/npm/v/cli-tool-creator.svg)](https://www.npmjs.com/package/cli-tool-creator)
+[![Codewake](https://www.codewake.com/badges/ask_question.svg)](https://www.codewake.com/p/cli-tool-creator)
+[![Stats](https://nodei.co/npm/cli-tool-creator.png?downloads=true&downloadRank=true&stars=true)](https://www.npmjs.com/package/cli-tool-creator)
+
 # CLI Tool Creator
 ***
 
@@ -120,13 +127,13 @@ options:{
 
 
 ##Step 2: Define a menu model
-The model object is made up of many key value pairs in the root structure where each pair represents a user-defined menu with a custom title and a custom list of options to pick from defined in the model.
+The model object is made up of many key value pairs in the root structure where each pair represents a user-defined menu with a custom title and a custom list of options to pick.
 
 To create a new menu you must give it a key name with an object as its value:
 
 ```Javascript
 model:{
-	"myMenuName":{}
+	"myNewMenu":{}
 }
 ```
 
@@ -140,7 +147,7 @@ model:{
 }
 ```
 
-So we have a title to our menu, but it doesn't do anything.  Now we start adding our list of options each with its own title:
+So we have a title to our menu, but it doesn't do anything.  Now we start adding our list of options each with its own title:  **NOTE: If options are not provided the program will error and end execution.**
 
 ```Javascript
 model:{
@@ -158,7 +165,7 @@ model:{
 }
 ```
 
-Finally we have our menu structure, but as you can tell there is no functionality other than displaying a title.
+**YAY!!! At this point we can run our application and see the initial layout without functionality.**
 
 ##Step: 3 - Add functionality to our menu items(options)
 ###Basic Navigation
@@ -186,14 +193,14 @@ model:{
 }
 ```
 
-In the above example, if we select the option from the first menu titled "Go to another menu", the menu with the key "anotherMenu" will be displayed.
+In the above example, if we select the option from the first menu titled "Go to another menu" and the menu with the key "anotherMenu" will be displayed.
 
 ***
 ###Modifying the config file
 * Now that we have basic navigation down, we can start interacting with the configuration file and setting values to our specific config model.
 
 ####Location
-* Before moving into creating or inserting items, we need to understand how to specify the location to save them to in our configuration file.  This is where the keyword ***"loc"*** comes into play.
+* Before moving into creating or inserting items, we need to understand how to specify the location to save them to  This is where the keyword ***"loc"*** comes into play.
 * The value of ***"Loc"*** is a key mapping using dot notation to lead to the specified location in the config file.  It always starts with a key in the root structure of config.
 
 **Example**
@@ -214,9 +221,9 @@ In the above example, if we select the option from the first menu titled "Go to 
 loc: "user.address.city"
 ```
 
-####Create
+####Create (*Refer to Insert for creating arrays*)
 * To create or edit values in the config file, we use the key name ***"create"*** and assign a value associated with the new value's type.
-* You can create a ***"string"***, ***"integer"***, ***"float"***, ***"boolean"***, ***"array"***, or ***"object"***.  These are the only options available right now.
+* You can create a ***"string"***, ***"integer"***, ***"float"***, ***"boolean"***, ***"array"***, ***"object"***, or ***"sequence"***.  **NOTE: sequence is a special case documentated later**. These are the only options available right now.
 
 ```Javascript
 //Creating basic string assigned to given location
@@ -309,6 +316,78 @@ options:[
 	error: "Seriously! Is it that hard to enter a 5 digit zip code? Do it again."
 }
 ```
+
+####Custom Key Names
+* We may easily encounter a situation where we want to create custom key value pairs where the user has control over both parts and up till now we've only let the user enter the value.
+* To specify using a custom key name we use the keyword ***"$USER_KEY"*** and add this as part of our location string
+* We can also customize all aspects of our custom key prompt just like with our value prompt by using the key names ***"keyPrompt"***, ***"keyRegex"***, and ***"keyError"***.
+
+```Javascript
+options: [
+	{
+		title: "Add a new enviornment variable",
+		create: "string",
+		loc: "envVars.$USER_KEY",         //key name for environment variable is user-created
+		keyPrompt: "Enter the name of your env variable: ",
+		keyRegex: /^[a-z][a-zA-Z0-9]*$/,  //Simple camelcase support regex for key
+		keyError: "Invalid variable name (alphanumeric with no spaces only).",
+		prompt: "Enter the value or your enviornment variable: "
+	}
+]
+```
+
+
+####Special Case: *"Sequence"*
+* Creating individual menu options to enter multiple key value pairs for the same object can get repetitive and tedious for the developer, and just plain annoying for the user.
+* A good example of this would be creating a profile for a user that contains information such as a first name, last name, phone number, email, street address, etc. **It doesn't make sense** to create a ton of menu options to handle each piece of information and this is where a ***"sequence"*** comes in.
+* A "sequence" declares a series(sequence) of unlimited number of prompts that are initiated by a single menu option.
+* Sequences can be generated using either the create or insert option.
+* Writing "create: "sequence"" is just a declaritive intent statement, and doesn't offer much detail, so we need to create a sequence array with a series of prompts and key names.
+* NOTE: The order in which you enter the key and prompt pairs into the array, is the order that the user will interact with them.
+
+```Javascript
+//Option to enter a basic user profile
+
+//Config - BEFORE executing sequence
+config: {
+	appName: "My application",
+	someVar: "Test"
+}
+
+//Sequence option
+{
+	title: "Add a user profile",
+	create: "sequence",
+	loc: "profiles.$USER_KEY", //We want a custom key name for each profile
+	keyPrompt: "Enter a user id: ",
+	sequence:[
+		{
+			key: "firstName",
+			prompt: "First Name: "
+		},
+		{
+			key: "lastName",
+			prompt: "Last Name: "
+		}
+	]
+}
+
+//When selecting the option we'll say that we entered the user id: 1234, firstName: Test, lastName: User.
+
+//Config - AFTER executing sequence
+config: {
+	appName: "My application",
+	someVar: "Test",
+	profiles:{
+		"1234": {
+			firstName: "Test",
+			lastName: "User"
+		}
+	}
+}
+
+```
+
 ***
 ###Utilizing the config file
 * In certain situations we may want to use values from our config file to help build our command line interface even further.
@@ -418,23 +497,4 @@ title: "I'm (either $1|never doing anything fun){user.hobbies.$LIST_OR}"
 * When we have an array of objects the key name ***"titleKey"*** defines which key to display its value as the menu option title
 
 ***
-####Custom Key Names
-* We may easily encounter a situation where we want to create custom key value pairs where the user has control over both parts and up till now we've only let the user enter the value.
-* To specify using a custom key name we use the keyword ***"$USER_KEY"*** and add this as part of our location string
-* We can also customize all aspects of our custom key prompt just like with our value prompt by using the key names ***"keyPrompt"***, ***"keyRegex"***, and ***"keyError"***.
-
-```Javascript
-options: [
-	{
-		title: "Add a new enviornment variable",
-		create: "string",
-		loc: "envVars.$USER_KEY",         //key name for environment variable is user-created
-		keyPrompt: "Enter the name of your env variable: ",
-		keyRegex: /^[a-z][a-zA-Z0-9]*$/,  //Simple camelcase support regex for key
-		keyError: "Invalid variable name (alphanumeric with no spaces only).",
-		prompt: "Enter the value or your enviornment variable: "
-	}
-]
-```
-
 ####Custom 

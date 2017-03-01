@@ -26,6 +26,8 @@ var cli = module.exports = function(config){
 		this.model = config.model;
 		//Root key name of model indicating current menu
 		this.currentMenu = this.options.start || 'main';
+		//Defines the default name of the application to create
+		this.defaultAppName = this.options.defaultAppName || null;
 		//Holds options to display on menu (stored here for the case of dynamic options)
 		this.menuList = null;
 		//Array holding navigation stack (navigating will push/pull from stack)
@@ -226,34 +228,43 @@ cli.prototype.createApplication = function(cb){
 	term["bg"+this.backgroundColor[0].toUpperCase() + this.backgroundColor.substring(1)](true);
 	term.clear();
 	term[this.promptColor].bold.underline("No Valid Applications were found in our search.\n");
-	term[this.promptColor].italic("Tip: If you do have an application make sure we can find it by including the root attribute \"searchIdentifier\": \"cli-tool\"\n\n");
+	term[this.promptColor].italic("Tip: If you do have an application, make sure we can find it by including the root attribute \"searchIdentifier\": \"cli-tool\"\n\n");
 	this.yesOrNo("Would you like to create a new application? [Y|n]", function(result){
 		if(!result){
 			term[this.promptColor].bold("Goodbye!!\n\n");
 			delay(1, exit);
 		}else{
-			this.inputField("Please enter a name for your application: ",{
-				regex: /^[a-z0-9 ]+$/i,
-				error: "Please try again with only alphanumeric characters and spaces"
-			}, function(name){
-				var app = {searchIdentifier: 'cli-tool', appName: name};
-				var fileName = name.toLowerCase().replace(/ /g, "_") + '.json';
-				if(this.options.estimatedDir[this.options.estimatedDir.length-1] == "/")
-					var fileLoc = this.options.estimatedDir + fileName; 
-				else
-					var fileLoc = this.options.estimatedDir + "/" + fileName;
-				this.config = app;
-				this.configDir = fileLoc;
-				//Attempt to create new application file
-				try{
-					jsonfile.writeFileSync(fileLoc, app, {spaces: 2});
-				}catch(e){
-					return this.error('File System', 'Could not create the application file', true);
-				}
-				return cb();
-			}.bind(this))
+			if(this.defaultAppName !== null && this.defaultAppName !== ''){
+				return this.createAppFile(this.defaultAppName, cb);
+			}else{
+				this.inputField("Please enter a name for your application: ",{
+					regex: /^[a-z0-9 ]+$/i,
+					error: "Please try again with only alphanumeric characters and spaces"
+				}, function(name){
+					return this.createAppFile(name, cb);
+				}.bind(this))
+			}
 		}
 	}.bind(this))
+}
+
+//Final function to create application file
+cli.prototype.createAppFile = function(name, cb){
+	var app = {searchIdentifier: 'cli-tool', appName: name};
+	var fileName = name.toLowerCase().replace(/ /g, "_") + '.json';
+	if(this.options.estimatedDir[this.options.estimatedDir.length-1] == "/")
+		var fileLoc = this.options.estimatedDir + fileName; 
+	else
+		var fileLoc = this.options.estimatedDir + "/" + fileName;
+	this.config = app;
+	this.configDir = fileLoc;
+	//Attempt to create new application file
+	try{
+		jsonfile.writeFileSync(fileLoc, app, {spaces: 2});
+	}catch(e){
+		return this.error('File System', 'Could not create the application file', true);
+	}
+	return cb();
 }
 
 //Will set this.menuList to valid options or dynamic options of 
@@ -304,9 +315,11 @@ cli.prototype.getKeys = function(options, cb){
 		else if(keysNeeded == 1){
 			var prompt = "Enter a key name: ";
 			var regex = /^[a-z][a-z0-9]*$/i;
+			if(options.regex)
+				regex = genRegex(options.regex);
 			var error = "Only use alphanumeric characters and key must begin with a letter";
 			this.inputField((options.keyPrompt || prompt), {
-				regex: (options.keyRegex || regex),
+				regex: regex,
 				error: (options.keyError || error)
 			}, function(keyName){
 				term("\n\n");
@@ -332,7 +345,7 @@ cli.prototype.getValue = function(options, cb){
 		this.getSequence(JSON.parse(JSON.stringify(options)), function(sequenceStructure){
 			return cb(sequenceStructure);
 		});
-	if(type == 'array')
+	else if(type == 'array')
 		return cb([]);
 	else if(type == 'object')
 		return cb({});
@@ -343,10 +356,12 @@ cli.prototype.getValue = function(options, cb){
 		})
 	}else if(type == 'string' || type == 'integer' || type == 'float'){
 		var regex = /.*/;
+		if(options.regex)
+			regex = genRegex(options.regex);
 		var error = "Invalid input. Please try again.";
 		var prompt = "Please enter in " + ((type == 'integer')? "an " : "a ") + type + " value: ";
 		var inputOptions = {
-			regex: options.regex || regex,
+			regex: regex,
 			error: options.error || error,
 			inputOptions:{
 				history: options.arrowSelect || []
@@ -377,7 +392,7 @@ cli.prototype.getSequence = function(options, cb){
 				this.error('Sequence', 'Item is missing a key', true);
 				//return cb(false);
 			}
-			this.getValue(_this, function(_thisValue){
+			this.getValue(JSON.parse(JSON.stringify(_this)), function(_thisValue){
 				if(typeof _thisValue !== 'undefined'){
 					options.finalSequence[_this.key] = _thisValue;
 				}
@@ -488,8 +503,8 @@ cli.prototype.getConfig = function(keyMap, returnType, preParsedArray){
 //Accepts options to set a configuration value at a certain location ("loc") key mapping
 cli.prototype.setConfig = function(options, cb){
 	if(typeof options.loc == 'string' && options.loc !== ""){
-		this.getKeys(options, function(keys){
-			this.getValue(options, function(value){
+		this.getKeys(JSON.parse(JSON.stringify(options)), function(keys){
+			this.getValue(JSON.parse(JSON.stringify(options)), function(value){
 				var failed = false;
 				var map = options.loc.split(".");
 				map = getArrayKeys(map);
@@ -811,6 +826,17 @@ function exit(){
 	term.fullscreen(false);
 	term.clear();
 	process.exit();
+}
+
+//Function to generate a regex object from an array ["regex_string", "options"]
+function genRegex(regex){
+	if(regex.length > 1){
+		return new RegExp(regex[0], regex[1]);
+	}else if(regex.length == 1){
+		return new RegExp(regex[0]);
+	}else{
+		return /.*/;
+	}
 }
 
 //Delay function with built in countdown timer (Will execute callback on completion)
