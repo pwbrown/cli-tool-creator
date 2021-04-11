@@ -8,18 +8,18 @@
 # CLI Tool Creator
 ***
 
-##Description
+## Description
 A CLI wrapper for your application configuration json files. Highly customizable to fit the needs of YOU, the developer.  Give it the content to display and the functionality to implement and this tool will take care of generating an approachable command-line graphical interface for your application users to interact with.
 
-##Purpose
+## Purpose
 This package seeks to resolve the concern of providing a complex but custom configuration model for your software that is easy for the end user to interact with and easy to build for the application developer. Inspiration for this project came from the use of custom command line interface tools that were built to aid in helping obsfucate the end result of the software from the nitty gritty details of its implementation.  A great example of this end result is the "package.json" file we so frequently use and love. It's not often that us as application developers would take the time to manually create our package.json file object, so we use tools like "npm init". Npm init is a great example of a very custom and simplistic use case of a command line interface, but this package seeks to help you as the developer replicate it's end result but with much more freedom and custom functionality.
 
 #NOTE: This project is in an *Alpha Testing* state and is not guarenteed to work properly in all cases
 
-##Installation
+## Installation
 	npm install cli-tool-creator --save
 	
-##Basic structure to get you started
+## Basic structure to get you started
 ```Javascript
 //Retrieve the package
 var cliCreator = require('cli-tool-creator');
@@ -40,7 +40,7 @@ cli.run();
 
 ***
 
-#Creating your application's Command Line Interface
+# Creating your application's Command Line Interface
 
 ***
 
@@ -54,7 +54,7 @@ options:{
 }
 ```
 
-###***estimatedDir*** - definition
+### ***estimatedDir*** - definition
 
 estimatedDir is the estimated location of the end-user's configuration file.  This allows this CLI package to search the estimated directory for valid configuration files and automatically load them into the custom CLI tool.  It is recommended to make use of nodejs built-in file system commands/variables to aid in this process.  ***This is also the location that the config file is saved to if the user goes through the prompts to create a new application.*** For example:
 	
@@ -62,13 +62,13 @@ estimatedDir is the estimated location of the end-user's configuration file.  Th
 		estimatedDir: __dirname   // Will search directory of execution for valid files
 	}
 	
-###***start*** - definition
+### ***start*** - definition
 
 start defines the name of a key in the root structure of the model to decide which menu to display first. This name is optional and if not provided will default to ***"main"***. Refer to model documentation (Step 2) for details on creating menus
 
-##***Additional Options:***
+## ***Additional Options:***
 
-###--*Welcome Text*
+### --*Welcome Text*
 **Options are as follows:**
 
 ```Javascript
@@ -81,7 +81,7 @@ options:{
 
 **NOTE: Welcome Text is displayed when the first menu has been displayed on application load**
 
-###--*Customize Colors*
+### --*Customize Colors*
 **Available Color Choices**:
 
 * white
@@ -108,7 +108,7 @@ options:{
 
 **NOTE: Cannot change the default "red" color for error messages!!**
 
-###--*System Notifications*
+### --*System Notifications*
 **NOTE: System Notications work for both Mac and Windows(pre and post 8)**
 
 * System Notifications are displayed whenever changes are made to the config file AND if a menu "message" option is provided
@@ -126,7 +126,7 @@ options:{
 ```
 
 
-##Step 2: Define a menu model
+## Step 2: Define a menu model
 The model object is made up of many key value pairs in the root structure where each pair represents a user-defined menu with a custom title and a custom list of options to pick.
 
 To create a new menu you must give it a key name with an object as its value:
@@ -167,8 +167,8 @@ model:{
 
 **YAY!!! At this point we can run our application and see the initial layout without functionality.**
 
-##Step: 3 - Add functionality to our menu items(options)
-###Basic Navigation
+## Step: 3 - Add functionality to our menu items(options)
+### Basic Navigation
 * To Navigate to another menu we add the key name of our next menu to a "pointer" option:
 
 ```Javascript
@@ -196,10 +196,10 @@ model:{
 In the above example, if we select the option from the first menu titled "Go to another menu" and the menu with the key "anotherMenu" will be displayed.
 
 ***
-###Modifying the config file
+### Modifying the config file
 * Now that we have basic navigation down, we can start interacting with the configuration file and setting values to our specific config model.
 
-####Location
+#### Location
 * Before moving into creating or inserting items, we need to understand how to specify the location to save them to  This is where the keyword ***"loc"*** comes into play.
 * The value of ***"Loc"*** is a key mapping using dot notation to lead to the specified location in the config file.  It always starts with a key in the root structure of config.
 
@@ -221,7 +221,7 @@ In the above example, if we select the option from the first menu titled "Go to 
 loc: "user.address.city"
 ```
 
-####Create (*Refer to Insert for creating arrays*)
+#### Create (*Refer to Insert for creating arrays*)
 * To create or edit values in the config file, we use the key name ***"create"*** and assign a value associated with the new value's type.
 * You can create a ***"string"***, ***"integer"***, ***"float"***, ***"boolean"***, ***"array"***, ***"object"***, or ***"sequence"***.  **NOTE: sequence is a special case documentated later**. These are the only options available right now.
 
@@ -245,7 +245,7 @@ options:[
 ]
 ```
 
-####Insert
+#### Insert
 * To insert a value into an array, we use the key name ***"insert"*** and assign a value associated with the new values's type.
 * ***Same types*** available ***as*** with the ***create*** key name.
 * We can also specify the index of our inserted value by providing an ***"index"*** number
@@ -271,7 +271,7 @@ options:[
 ]
 ```
 
-####Custom Prompt
+#### Custom Prompt
 * All user prompts have default strings that will be displayed **but** we may decide to customize those.
 * To customize this we use the key name ***"prompt"*** to signify a custom value prompt.
 
@@ -285,7 +285,7 @@ options:[
 }
 ```
 
-####Custom Regex
+#### Custom Regex
 * All user prompts of type "string" or "number" have default regular expressions associated with them.
 * We can customize these regular expressions to better suite our custom input if necessary.
 * To do this we simply use the ***"regex"*** key name
@@ -301,7 +301,7 @@ options:[
 }
 ```
 
-####Custom Error
+#### Custom Error
 * All user prompts have a default error message if the user prompt fails or if the given value does not match the default or custom regular expression.
 * Customize the error message with the ***"error"*** key name
 
@@ -317,7 +317,7 @@ options:[
 }
 ```
 
-####Custom Key Names
+#### Custom Key Names
 * We may easily encounter a situation where we want to create custom key value pairs where the user has control over both parts and up till now we've only let the user enter the value.
 * To specify using a custom key name we use the keyword ***"$USER_KEY"*** and add this as part of our location string
 * We can also customize all aspects of our custom key prompt just like with our value prompt by using the key names ***"keyPrompt"***, ***"keyRegex"***, and ***"keyError"***.
@@ -337,7 +337,7 @@ options: [
 ```
 
 
-####Special Case: *"Sequence"*
+#### Special Case: *"Sequence"*
 * Creating individual menu options to enter multiple key value pairs for the same object can get repetitive and tedious for the developer, and just plain annoying for the user.
 * A good example of this would be creating a profile for a user that contains information such as a first name, last name, phone number, email, street address, etc. **It doesn't make sense** to create a ton of menu options to handle each piece of information and this is where a ***"sequence"*** comes in.
 * A "sequence" declares a series(sequence) of unlimited number of prompts that are initiated by a single menu option.
@@ -389,7 +389,7 @@ config: {
 ```
 
 ***
-###Utilizing the config file
+### Utilizing the config file
 * In certain situations we may want to use values from our config file to help build our command line interface even further.
 
 ####Inserting a config value into a string
@@ -421,7 +421,7 @@ menu1: {
 
 * ***What about currency?*** We use the "$" symbol to indicate a back reference string insert, but what if we want to use the explicitly display the "$" symbol as part of our string.  To do this we use **"$$"** which will be displayed as "$" in the final string (***Note: only applies to success string***).
 
-####Additional Modifiers:
+#### Additional Modifiers:
 * These modifiers help with retrieving values in the above parsing syntax and are added to the location string.
 
 ***Following examples will use this config file structure***
@@ -451,7 +451,7 @@ config:{
 }
 ```
 
-#####Exists
+##### Exists
 * If we are not performaing a string insert we can still check to see if something simply exists in order to trigger a success string
 * Use the keyword ***"$EXISTS"*** at the end of your location string
 
@@ -461,7 +461,7 @@ title: "The user (has|has not){user.expenses.$EXISTS} spent money"
 //user.expenses exists in our config file so "The user has spent money" will be displayed
 ```
 
-#####Size/Length of
+##### Size/Length of
 * If we want to check to make sure an object or an array has elements in it, we can use the ***"$SIZE"*** keyword.
 * This modifier will also return the size number for use in string inserts.
 * ***Note: A size of 0 will result in the failure string***
@@ -472,7 +472,7 @@ title: "The user (has $1|does not have){user.siblings.$SIZE} siblings"
 //user.siblings is an array of size 0, so "The user does not have siblings" will be displayed
 ```
 
-#####Array/Object List
+##### Array/Object List
 * In order to list out the contents of an array or the key names of an object in string form we can use the ***"$LIST_AND"*** or the ***"$LIST_OR"*** keywords.
 * This will take the elements of an array of the keynames of an object and list them in the form "item1, item2, item3, or item4".
 * ***NOTE: The difference between $LIST\_AND and $LIST\_OR is whether or not it prints the word "and" or the word "or" between the last two items in the list***
@@ -487,14 +487,14 @@ title: "I'm (either $1|never doing anything fun){user.hobbies.$LIST_OR}"
 //***prints: "I'm either Biking, Swimming, Hiking, Eating, or Watching Netflix"
 ```
 
-###Creating menu options using a configuration array/object
+### Creating menu options using a configuration array/object
 * We may have an array of objects or an object that we want to turn into a new menu after that changes as the array changes.
 * In order to create a dynamic menu we simply substitute the menu options array for a location string
 * To assign options to each item, simply add options
 
-####Additional Options
-#####Title Key
+#### Additional Options
+##### Title Key
 * When we have an array of objects the key name ***"titleKey"*** defines which key to display its value as the menu option title
 
 ***
-####Custom 
+#### Custom 
